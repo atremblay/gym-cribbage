@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 # @Author: alexis
 # @Date:   2019-03-03 16:47:17
-# @Last Modified by:   alexis
-# @Last Modified time: 2019-03-09 13:26:51
+# @Last Modified by:   Alexis Tremblay
+# @Last Modified time: 2019-03-09 13:41:35
 
 
 from itertools import product, combinations
@@ -170,7 +170,13 @@ class Stack(object):
 
 
 class Cribbage(object):
-    """docstring for Cribbage"""
+    """
+    Cribbage class calculates the points during the pegging phase.
+    When a player step through the environment, this class returns the state as
+    a tuple of cards that are currently used in this pegging round and the
+    previous cards played in previous pegging rounds. The reward is the number
+    of point following the last card played. The
+    """
 
     def __init__(self):
         super(Cribbage, self).__init__()
@@ -193,6 +199,23 @@ class Cribbage(object):
         self.current_play = Stack()
 
     def step(self, card):
+        """
+        Add the card to the current play and calculates the reward for it.
+        Never checks if the move is illegal (i.e. total card value is
+        higher than 31)
+
+        Params
+        ======
+            card: Card
+                A card object
+
+        Returns
+        =======
+            (current play, past plays), points, total: (Stack, Stack), int, int
+            points is the reward for the last card played
+            total is the cummulative value of the card played in the current
+            play.
+        """
         self.current_play.add_(card)
         reward = self._evaluate_current_play()
         total = np.array([c.value for c in self.current_play]).sum()
@@ -354,6 +377,10 @@ if __name__ == '__main__':
     knob = Card(RANKS[4], SUITS[0])
     assert evaluate_hand(hand, knob) == 12
 
+    hand = Stack(cards=[Card(RANKS[i], SUITS[0]) for i in range(4)])
+    knob = Card(RANKS[5], SUITS[0])
+    assert evaluate_hand(hand, knob) == 11
+
     hand = Stack(cards=[Card(RANKS[i], SUITS[0]) for i in [1, 1, 2, 3, 4]])
     assert evaluate_hand(hand) == 15
 
@@ -423,3 +450,16 @@ if __name__ == '__main__':
     assert cribbage.step(Card(RANKS[2], SUITS[2]))[1] == 0
     assert cribbage.step(Card(RANKS[3], SUITS[2]))[1] == 0
     assert cribbage.step(Card(RANKS[1], SUITS[2]))[1] == 4
+
+    # Transfert cards from the current play to past plays
+    cribbage.reset()
+    cribbage.step(Card(RANKS[0], SUITS[2]))
+    assert len(cribbage.current_play) == 1
+    assert cribbage.current_play[0].suit == SUITS[2]
+    assert cribbage.current_play[0].rank == RANKS[0]
+    assert len(cribbage.past_plays) == 0
+    cribbage.new_play()
+    assert len(cribbage.current_play) == 0
+    assert len(cribbage.past_plays) == 1
+    assert cribbage.past_plays[0].suit == SUITS[2]
+    assert cribbage.past_plays[0].rank == RANKS[0]
