@@ -2,16 +2,22 @@
 # @Author: alexis
 # @Date:   2019-03-03 16:47:17
 # @Last Modified by:   Alexis Tremblay
-# @Last Modified time: 2019-03-09 13:41:35
+# @Last Modified time: 2019-03-09 14:07:20
 
 
 from itertools import product, combinations
 import random
 import numpy as np
+import torch.nn as nn
+import torch
 
 
 SUITS = "♤♡♧♢"
 RANKS = ["A", 2, 3, 4, 5, 6, 7, 8, 9, 10, "J", "Q", "K"]
+
+# Starting the idx at 1 because 0 will be used as padding
+rank_to_idx = {r: i for i, r in enumerate(RANKS, 1)}
+suit_to_idx = {s: i for i, s in enumerate(SUITS, 1)}
 
 
 class Card(object):
@@ -330,6 +336,32 @@ def same_suit_points(hand, knob, is_crib=False):
     return points
 
 
+def card_to_idx(card):
+    return (rank_to_idx[card.rank], suit_to_idx[card.suit])
+
+
+def stack_to_idx(stack):
+    return tuple(
+        zip(*[card_to_idx(c) for c in stack])
+    )
+
+
+class PlayValue(nn.Module):
+    """docstring for PlayValue"""
+
+    def __init__(self):
+        super(PlayValue, self).__init__()
+        self.rank_embed = nn.Embedding(len(RANKS) + 1, 3, padding_idx=0)
+        self.suit_embed = nn.Embedding(len(SUITS) + 1, 3, padding_idx=0)
+        self.rnn = nn.RNN(input_size=6, hidden_size=3)
+
+    def forward(self, ranks, suits):
+        rank_embedding = self.rank_embed(ranks)
+        suit_embedding = self.suit_embed(suits)
+        x = torch.cat([rank_embedding, suit_embedding], dim=2)
+        return self.rnn(x)
+
+
 if __name__ == '__main__':
 
     assert is_sequence(
@@ -463,3 +495,29 @@ if __name__ == '__main__':
     assert len(cribbage.past_plays) == 1
     assert cribbage.past_plays[0].suit == SUITS[2]
     assert cribbage.past_plays[0].rank == RANKS[0]
+
+    assert card_to_idx(Card(RANKS[0], SUITS[2])) == (1, 3)
+    hand = Stack(
+        cards=[
+            Card(RANKS[4], SUITS[0]),
+            Card(RANKS[4], SUITS[1]),
+            Card(RANKS[4], SUITS[2]),
+            Card(RANKS[10], SUITS[3])
+        ]
+    )
+
+    assert stack_to_idx(hand) == ((5, 5, 5, 11), (1, 2, 3, 4))
+
+    deck = Deck()
+    hand = Stack()
+    hand.add_(deck.deal())
+    hand.add_(deck.deal())
+    hand.add_(deck.deal())
+    hand.add_(deck.deal())
+    ranks, suits = stack_to_idx(hand)
+    ranks = torch.tensor([ranks])
+    suits = torch.tensor([suits])
+    play_value = PlayValue()
+    x, _ = play_value(ranks, suits)
+    print(x.shape)
+    print(x)
