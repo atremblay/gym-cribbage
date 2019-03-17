@@ -8,5 +8,5 @@ from setuptools import setup
 
 setup(name='gym_cribbage',
       version='0.0.1',
-      install_requires=['gym']  # And any other dependencies cribbage needs
+      install_requires=['gym', 'numpy']  # And any other dependencies cribbage needs
 )

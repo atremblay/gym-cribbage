@@ -8,8 +8,7 @@
 from itertools import product, combinations
 import random
 import numpy as np
-import torch.nn as nn
-import torch
+import gym
 
 
 SUITS = "♤♡♧♢"
@@ -175,7 +174,7 @@ class Stack(object):
         return self.cards[idx]
 
 
-class Cribbage(object):
+class CribbageEnv(gym.Env):
     """
     Cribbage class calculates the points during the pegging phase.
     When a player step through the environment, this class returns the state as
@@ -185,7 +184,7 @@ class Cribbage(object):
     """
 
     def __init__(self):
-        super(Cribbage, self).__init__()
+        super(CribbageEnv, self).__init__()
 
     def reset(self):
         """
@@ -344,180 +343,3 @@ def stack_to_idx(stack):
     return tuple(
         zip(*[card_to_idx(c) for c in stack])
     )
-
-
-class PlayValue(nn.Module):
-    """docstring for PlayValue"""
-
-    def __init__(self):
-        super(PlayValue, self).__init__()
-        self.rank_embed = nn.Embedding(len(RANKS) + 1, 3, padding_idx=0)
-        self.suit_embed = nn.Embedding(len(SUITS) + 1, 3, padding_idx=0)
-        self.rnn = nn.RNN(input_size=6, hidden_size=3)
-
-    def forward(self, ranks, suits):
-        rank_embedding = self.rank_embed(ranks)
-        suit_embedding = self.suit_embed(suits)
-        x = torch.cat([rank_embedding, suit_embedding], dim=2)
-        return self.rnn(x)
-
-
-if __name__ == '__main__':
-
-    assert is_sequence(
-        cards=[
-            Card(RANKS[4], SUITS[0]),
-            Card(RANKS[5], SUITS[1]),
-            Card(RANKS[6], SUITS[2]),
-            Card(RANKS[7], SUITS[3])
-        ]
-    )
-
-    assert not is_sequence(
-        cards=[
-            Card(RANKS[4], SUITS[0]),
-            Card(RANKS[4], SUITS[1]),
-            Card(RANKS[4], SUITS[2]),
-            Card(RANKS[10], SUITS[3])
-        ]
-    )
-
-    hand = Stack(
-        cards=[
-            Card(RANKS[0], SUITS[0]),
-            Card(RANKS[2], SUITS[0]),
-            Card(RANKS[3], SUITS[0]),
-            Card(RANKS[5], SUITS[0])
-        ]
-    )
-
-    # For a regular hand, if all cards in hand are of the same suit, then you
-    # get the points. If the knob is also of the same suit you get an
-    # extra point
-    assert evaluate_hand(hand, knob=Card(RANKS[7], SUITS[0])) == 9
-    assert evaluate_hand(hand, knob=Card(RANKS[7], SUITS[1])) == 8
-
-    # Crib hand needs to have all same suit including the knob, otherwise
-    # you don't get the points for the same suit
-    assert evaluate_hand(hand, knob=Card(RANKS[7], SUITS[0]), is_crib=True) == 9
-    assert evaluate_hand(hand, knob=Card(RANKS[7], SUITS[1]), is_crib=True) == 4
-
-    hand = Stack(cards=[Card(RANKS[i], SUITS[0]) for i in range(5)])
-    assert evaluate_hand(hand) == 12
-
-    hand = Stack(cards=[Card(RANKS[i], SUITS[0]) for i in range(4)])
-    knob = Card(RANKS[4], SUITS[0])
-    assert evaluate_hand(hand, knob) == 12
-
-    hand = Stack(cards=[Card(RANKS[i], SUITS[0]) for i in range(4)])
-    knob = Card(RANKS[5], SUITS[0])
-    assert evaluate_hand(hand, knob) == 11
-
-    hand = Stack(cards=[Card(RANKS[i], SUITS[0]) for i in [1, 1, 2, 3, 4]])
-    assert evaluate_hand(hand) == 15
-
-    hand = Stack(cards=[Card(RANKS[i], SUITS[0]) for i in [1, 1, 1, 2, 3]])
-    assert evaluate_hand(hand) == 20
-
-    hand = Stack(cards=[Card(RANKS[i], SUITS[0]) for i in [1, 3, 5, 7]])
-    knob = Card(RANKS[9], SUITS[0])
-    assert evaluate_hand(hand, knob) == 5
-
-    hand = Stack(cards=[Card(RANKS[i], SUITS[0]) for i in [1, 3, 5, 7]])
-    knob = Card(RANKS[9], SUITS[1])
-    assert evaluate_hand(hand, knob) == 4
-
-    hand = Stack(cards=[Card(RANKS[i], SUITS[0]) for i in [1, 3, 5, 10]])
-    assert evaluate_hand(hand, knob=Card(RANKS[-1], SUITS[0])) == 6
-
-    # Best possible hand
-    hand = Stack(
-        cards=[
-            Card(RANKS[4], SUITS[0]),
-            Card(RANKS[4], SUITS[1]),
-            Card(RANKS[4], SUITS[2]),
-            Card(RANKS[10], SUITS[3])
-        ]
-    )
-    assert evaluate_hand(hand, knob=Card(RANKS[4], SUITS[3])) == 29
-
-    cribbage = Cribbage()
-    cribbage.reset()
-    assert cribbage.step(Card(RANKS[0], SUITS[0]))[1] == 0
-    assert cribbage.step(Card(RANKS[0], SUITS[1]))[1] == 2
-    assert cribbage.step(Card(RANKS[0], SUITS[2]))[1] == 6
-    assert cribbage.step(Card(RANKS[1], SUITS[2]))[1] == 0
-    assert cribbage.step(Card(RANKS[2], SUITS[2]))[1] == 3
-
-    cribbage.reset()
-    assert cribbage.step(Card(RANKS[0], SUITS[2]))[1] == 0
-    assert cribbage.step(Card(RANKS[1], SUITS[2]))[1] == 0
-    assert cribbage.step(Card(RANKS[2], SUITS[2]))[1] == 3
-    assert cribbage.step(Card(RANKS[8], SUITS[2]))[1] == 2
-
-    cribbage.reset()
-    assert cribbage.step(Card(RANKS[0], SUITS[0]))[1] == 0
-    assert cribbage.step(Card(RANKS[0], SUITS[1]))[1] == 2
-    assert cribbage.step(Card(RANKS[0], SUITS[2]))[1] == 6
-    assert cribbage.step(Card(RANKS[0], SUITS[3]))[1] == 12
-
-    cribbage.reset()
-    assert cribbage.step(Card(RANKS[4], SUITS[0]))[1] == 0
-    assert cribbage.step(Card(RANKS[9], SUITS[1]))[1] == 2
-
-    cribbage.reset()
-    assert cribbage.step(Card(RANKS[4], SUITS[0]))[1] == 0
-    assert cribbage.step(Card(RANKS[10], SUITS[1]))[1] == 2
-
-    cribbage.reset()
-    assert cribbage.step(Card(RANKS[4], SUITS[0]))[1] == 0
-    assert cribbage.step(Card(RANKS[11], SUITS[1]))[1] == 2
-
-    cribbage.reset()
-    assert cribbage.step(Card(RANKS[4], SUITS[0]))[1] == 0
-    assert cribbage.step(Card(RANKS[12], SUITS[1]))[1] == 2
-
-    cribbage.reset()
-    assert cribbage.step(Card(RANKS[0], SUITS[2]))[1] == 0
-    assert cribbage.step(Card(RANKS[2], SUITS[2]))[1] == 0
-    assert cribbage.step(Card(RANKS[3], SUITS[2]))[1] == 0
-    assert cribbage.step(Card(RANKS[1], SUITS[2]))[1] == 4
-
-    # Transfert cards from the current play to past plays
-    cribbage.reset()
-    cribbage.step(Card(RANKS[0], SUITS[2]))
-    assert len(cribbage.current_play) == 1
-    assert cribbage.current_play[0].suit == SUITS[2]
-    assert cribbage.current_play[0].rank == RANKS[0]
-    assert len(cribbage.past_plays) == 0
-    cribbage.new_play()
-    assert len(cribbage.current_play) == 0
-    assert len(cribbage.past_plays) == 1
-    assert cribbage.past_plays[0].suit == SUITS[2]
-    assert cribbage.past_plays[0].rank == RANKS[0]
-
-    assert card_to_idx(Card(RANKS[0], SUITS[2])) == (1, 3)
-    hand = Stack(
-        cards=[
-            Card(RANKS[4], SUITS[0]),
-            Card(RANKS[4], SUITS[1]),
-            Card(RANKS[4], SUITS[2]),
-            Card(RANKS[10], SUITS[3])
-        ]
-    )
-
-    assert stack_to_idx(hand) == ((5, 5, 5, 11), (1, 2, 3, 4))
-
-    deck = Deck()
-    hand = Stack()
-    hand.add_(deck.deal())
-    hand.add_(deck.deal())
-    hand.add_(deck.deal())
-    hand.add_(deck.deal())
-    ranks, suits = stack_to_idx(hand)
-    ranks = torch.tensor([ranks])
-    suits = torch.tensor([suits])
-    play_value = PlayValue()
-    x, _ = play_value(ranks, suits)
-    print(x.shape)
-    print(x)
