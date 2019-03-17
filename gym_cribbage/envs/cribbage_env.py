@@ -250,6 +250,12 @@ class CribbageEnv(gym.Env):
 
         return points
 
+    def render(self, mode='human'):
+        pass
+
+    def close(self):
+        pass
+
 
 def evaluate_hand(hand, knob=None, is_crib=False):
     """
