@@ -5,19 +5,27 @@
 # @Last Modified time: 2019-03-09 14:07:20
 
 
+from copy import copy
 from itertools import product, combinations
-import random
-import numpy as np
 import gym
-
+import logging
+import numpy as np
+import random
 
 SUITS = "♤♡♧♢"
 RANKS = ["A", 2, 3, 4, 5, 6, 7, 8, 9, 10, "J", "Q", "K"]
+
+MAX_TABLE_VALUE = 31
+
+FORMAT = "[%(lineno)s: %(funcName)24s] %(message)s"
+#FORMAT = "[%(name)s] %(levelname)s: %(message)s"
 
 # Starting the idx at 1 because 0 will be used as padding
 rank_to_idx = {r: i for i, r in enumerate(RANKS, 1)}
 suit_to_idx = {s: i for i, s in enumerate(SUITS, 1)}
 
+# For debug information.
+logging.basicConfig(level=logging.WARN, format=FORMAT)
 
 class Card(object):
     """Card, french style"""
@@ -174,34 +182,95 @@ class Stack(object):
         return self.cards[idx]
 
 
+class State(object):
+    """
+    Contains the state of the current hand. The state tells the external world:
+    1) The hand (playable cards only) of the current player.
+    2) The ID of the current player.
+    3) The ID of the player who recieves this turn's reward.
+    4) The phase of the game {0: the deal, 1: the play, 2: the show}.
+    """
+    def __init__(self, hand, hand_id, reward_id, phase):
+        self.hand = hand
+        self.hand_id = hand_id
+        self.reward_id = reward_id
+        self.phase = phase
+
+
 class CribbageEnv(gym.Env):
     """
     Cribbage class calculates the points during the pegging phase.
     When a player step through the environment, this class returns the state as
     a tuple of cards that are currently used in this pegging round and the
     previous cards played in previous pegging rounds. The reward is the number
-    of point following the last card played. The
+    of point following the last card played. TODO: The
     """
 
-    def __init__(self):
+    def __init__(self, n_players=2, verbose=False):
         super(CribbageEnv, self).__init__()
+
+        self.n_players = n_players
+        if self.n_players < 2 or self.n_players > 4:
+            raise ValueError("Cribbage is played by 2-4 players.")
+
+        if self.n_players == 2:
+            self._cards_per_hand = 6
+        else:
+            self._cards_per_hand = 5
+
+        self.logger = logging.getLogger(__name__)
+
+        if verbose:
+            self.logger.setLevel(logging.DEBUG)
+
+        self.initialized = False
 
     def reset(self):
         """
-        Call this when a new deck is created.
+        Shuffles the deck, deals cards to each of the n_player's hands, and
+        randomly selects the dealer. Each user recieves the appropriate
+        number of cards.
         """
-        self.past_plays = Stack()
-        self.current_play = Stack()
+        self.deck = Deck()
 
-    def new_play(self):
-        """
-        This method transfers the cards from the current play stack to the
-        past play stack and resets the current play stack. Call this when
-        no player can play or the total points on the table is 31.
-        """
-        for card in self.current_play:
-            self.past_plays.add_(card)
-        self.current_play = Stack()
+        # Stores the playable cards in each player's hand.
+        self.hands = [Stack() for i in range(self.n_players)]
+
+        # Stores the cards played by each player.
+        self.played = [Stack() for i in range(self.n_players)]
+
+        # Stores the cards played by each player (in order) for The Play.
+        self.table = Stack()
+
+        # Stores the crib generated during The Deal.
+        self.crib = Stack()
+        self.starter = Stack()
+        self.discarded = Stack()
+
+        # Randomly select the dealer. Initalize the player to be the same.
+        self.dealer = random.randint(0, self.n_players-1)
+        self.player = copy(self.dealer)
+        self.last_player = copy(self.dealer)
+
+        self.table_value = 0
+        self.phase = 0  # 0: the deal, 1: the play, 2: the show.
+
+        # Deal cards to all users.
+        for i in range(self.n_players):
+            for j in range(self._cards_per_hand):
+                self.hands[i].add_(self.deck.deal())
+
+        # Return the hand of the dealer.
+        self.state = State(
+            self.hands[self.player],
+            self.player,
+            None,
+            self.phase
+        )
+
+        self.initialized = True
+
+        return(self.state, 0, False, "Reset!")
 
     def step(self, card):
         """
@@ -221,34 +290,130 @@ class CribbageEnv(gym.Env):
             total is the cummulative value of the card played in the current
             play.
         """
-        self.current_play.add_(card)
-        reward = self._evaluate_current_play()
-        total = np.array([c.value for c in self.current_play]).sum()
+        if self.initialized == False:
+            raise Exception("Need to CribbageEnv.reset() before first step.")
 
-        return (self.current_play, self.past_plays), reward, total
+        done = False
+        debug = "step!"
 
-    def _evaluate_current_play(self):
-        points = 0
-        # Check if last cards are of the same rank value
-        num_cards = len(self.current_play)
-        rank_values = [c.rank_value for c in self.current_play]
-        values = [c.value for c in self.current_play]
-        for i in range(num_cards - 1):
-            if len(set(rank_values[i:])) == 1:
-                x = num_cards - i
-                points += x * (x - 1)
-                break
+        # The Deal.
+        if self.phase == 0:
 
-        if sum(values) == 15:
-            points += 2
+            # Move card from hand to crib.
+            self.hands[self.player].discard(card)
+            self.crib.add_(card)
 
-        for i in range(num_cards - 2):
-            n = num_cards - i
-            if is_sequence(self.current_play[i:]):
-                points += n
-                break
+            # Keep track of number of cards in play.
+            counts, playable_hands = self._count_playable_cards()
+            reward = 0
 
-        return points
+            # The crib is complete.
+            if sum(counts) / float(self.n_players) == 4:
+                self.phase = 1
+                self.starter = [self.deck.deal()]
+
+                self.logger.debug("Starter drawn={}".format(self.starter))
+
+                # 2 for his heels.
+                if self.starter[0].rank == "J":
+                    reward = 2
+                    self.logger.debug("Two for his heels!")
+
+                # Start next phase from the left of the dealer.
+                self._next_player(from_dealer=True)
+
+                self.logger.debug("Crib complete, move to The Play.")
+
+            else:
+                self._next_player()
+
+            self.state = State(
+                playable_hands[self.player],
+                self.player,
+                self.dealer,
+                self.phase
+            )
+
+        # The Play.
+        elif self.phase == 1:
+
+            # Move card from player's hand to table. Keep track of player's
+            # played cards in "played", which we need for The Show.
+            self.hands[self.player].discard(card)
+            self.played[self.player].add_(card)
+            self.table.add_(card)
+            reward = self._evaluate_play()
+            self._update_table_value()
+
+            # Check to see who can play next.
+            counts, playable_hands = self._count_playable_cards()
+
+            # self.last_player recieves the reward.
+            self.last_player = copy(self.player)
+
+            # Go! If no one else can play, give this player an extra 2 points.
+            if sum(counts) == 0:
+
+                # Reward player for placing the last card.
+                if self.table_value == MAX_TABLE_VALUE:
+                    reward += 2
+                else:
+                    reward += 1
+
+                remaining_cards = self._count_remaining_cards()
+
+                # Move onto The Show.
+                if remaining_cards == 0:
+                    self.logger.debug("No cards left, time for The Show.")
+                    self.phase = 2
+                    self._next_player(from_dealer=True)
+
+                # Reset the table and playable cards.
+                else:
+                    self.logger.debug(
+                        "Resetting table! table_value={} n_cards={}".format(
+                            self.table_value, remaining_cards)
+                    )
+                    self._reset_table()
+                    self._next_player()
+                    counts, playable_hands = self._count_playable_cards()
+
+            # Go! Skip to the next player who has a playable hand.
+            else:
+                self._next_player()
+
+                while counts[self.player] == 0:
+                    self.logger.debug("Go! Skip player {}, hand={}/{}".format(
+                        self.player,
+                        playable_hands[self.player],
+                        self.hands[self.player])
+                    )
+                    self._next_player()
+
+            # When self.phase == 2, playable_hands[self.player] will be empty.
+            self.state = State(
+                playable_hands[self.player],
+                self.player,
+                self.last_player,
+                self.phase
+            )
+
+        # The Show.
+        elif self.phase == 2:
+
+            # Calculate points for self.player.
+            reward = self._evaluate_show()
+
+            # Went around the circle once. This hand is over.
+            if self.player == self.dealer:
+                done = True
+
+            self.last_player = copy(self.player)
+            self._next_player()
+
+            self.state = State([], self.player, self.last_player, self.phase)
+
+        return(self.state, reward, done, debug)
 
     def render(self, mode='human'):
         pass
@@ -256,55 +421,171 @@ class CribbageEnv(gym.Env):
     def close(self):
         pass
 
+    def _update_table_value(self):
+        """
+        Calculates the value of all cards played on the table.
+        """
+        self.table_value = np.array([c.value for c in self.table]).sum()
 
-def evaluate_hand(hand, knob=None, is_crib=False):
+    def _count_playable_cards(self):
+        """
+        Counts the number of cards in each player's hand that can be
+        legally played, i.e., adding them to the table would not make
+        the table go over 31.
+        """
+        counts, playable_hands = [], []
+
+        for hand in self.hands:
+            count = 0
+            playable_hand = []
+
+            for card in hand:
+                if self.table_value + card.value <= MAX_TABLE_VALUE:
+                    count += 1
+                    playable_hand.append(card)
+
+            counts.append(count)
+            playable_hands.append(playable_hand)
+
+        self.logger.debug("Table={}, playable cards={}".format(
+            self.table_value, playable_hands)
+        )
+
+        return(counts, playable_hands)
+
+    def _count_remaining_cards(self):
+        """Counts the sum of the cards in all hands."""
+        remaining_cards = 0
+
+        for hand in self.hands:
+            remaining_cards += len(hand)
+
+        self.logger.debug('Total remaining cards={}'.format(remaining_cards))
+
+        return(remaining_cards)
+
+    def _next_player(self, from_dealer=False):
+        """
+        Increments through the players. Increments forever, but can be set
+        to start from the dealer.
+        """
+        if from_dealer:
+            self.player = copy(self.dealer)
+
+        self.player += 1
+        if self.player > self.n_players-1:
+            self.player = 0
+
+        self.logger.debug("Player={}".format(self.player))
+
+    def _reset_table(self):
+        """
+        This method moves all cards on the table to a discard pile and
+        clears the table by initialzing an empty stack. Called when
+        no player can play or the total points on the table is 31.
+        """
+        for card in self.table.cards:
+            self.discarded.add_(card)
+
+        self.table_value = 0
+        self.table = Stack()
+
+    def _evaluate_play(self):
+        """
+        Evaluates points for the last-played card during The Play.
+        These calculations do not include the starter.
+        """
+        points = evaluate_cards(self.table)
+
+        self.logger.debug('PLAY: player {} earned {} points'.format(
+            self.player, points)
+        )
+
+        return(points)
+
+    def _evaluate_show(self):
+        """
+        Evaluates points for a given set of cards during The Show.
+        These calculations include the starter. If the player is the dealer,
+        also add the points from the crib.
+        """
+        points = evaluate_cards(
+            self.played[self.player],
+            starter=self.starter[0]
+        )
+
+        if self.player == self.dealer:
+            points += evaluate_cards(
+                self.crib,
+                starter=self.starter[0],
+                is_crib=True
+            )
+
+        self.logger.debug('SHOW: player {} earned {} points'.format(
+            self.player, points)
+        )
+
+        return(points)
+
+
+def evaluate_cards(cards, starter=None, is_crib=False):
     """
     This is to evaluate the number of points in a hand. Optionnally with the
     knob
     """
-    hand_without_knob = Stack.from_stack(hand)
-    if knob is not None:
-        hand = hand.add(knob)
+
+    points = 0
+
+    # If only one card on the table.
+    if len(cards) == 1:
+        return(points)
+
+    # Sequence of cards, with or without the starter.
+    cards_without_starter = Stack.from_stack(cards)
+    if starter is not None:
+        cards = cards.add(starter)
 
     # List of all card combinations: 2 in n, 3 in n, ..., n in n
     all_combinations = []
-    for i in range(2, len(hand) + 1):
-        all_combinations.append(list(combinations(hand, i)))
+    for i in range(2, len(cards) + 1):
+        all_combinations.extend(list(combinations(cards, i)))
 
-    points = 0
+
     # Check for pairs. Check only the combinations of two cards
-    for left, right in all_combinations[0]:
-        if left.rank_value == right.rank_value:
-            points += 2
+    for combination in all_combinations:
+        if len(combination) == 2:
+            left, right = combination
 
-    # Check for suits
-    # Starting with full deck
-    # Need at least 3 cards for this
-    found_sequence = False
-    for comb in reversed(all_combinations[1:]):
-        for comb_ in comb:
-            if is_sequence(comb_):
-                points += len(comb_)
-                found_sequence = True
-        if found_sequence:
-            break
-
-    points += same_suit_points(hand_without_knob, knob, is_crib)
-
-    # Check for 15
-    # Starting with every two cards combinations
-    for comb in all_combinations:
-        for comb_ in comb:
-            cards = list(sorted(comb_))
-            if sum(c.value for c in cards) == 15:
+            if left.rank_value == right.rank_value:
                 points += 2
 
-    if knob is not None:
-        for card in hand_without_knob:
-            if card.rank == "J" and card.suit == knob.suit:
+    # Check for suits, starting with full deck. Minimum 3 cards.
+    # Since we reverse through all_combinations, finds the longest sequence.
+    sequence_found = False
+
+    for combnation in reversed(all_combinations[1:]):
+        if is_sequence(combination):
+            points += len(combination)
+            sequence_found = True
+
+        if sequence_found:
+            break
+
+    points += same_suit_points(cards_without_starter, starter, is_crib)
+
+    # Check for 15s, starting with two card combinations.
+    for combination in all_combinations:
+        cards = list(sorted(combination))
+        if sum(c.value for c in cards) == 15:
+            points += 2
+
+    # Check for cards with same suit as starter.
+    if starter is not None:
+        for card in cards_without_starter:
+            if card.rank == "J" and card.suit == starter.suit:
                 points += 1
 
-    return points
+    return(points)
 
 
 def is_sequence(cards):
@@ -324,6 +605,7 @@ def same_suit_points(hand, knob, is_crib=False):
     # to be of the same suit. Otherwise you only need the cards in your hands
     # to be of the same suit. If the knob is also of the same suit then you
     # get an extra point
+
     points = 0
     hand_without_knob = Stack.from_stack(hand)
     if knob is not None:
@@ -349,3 +631,18 @@ def stack_to_idx(stack):
     return tuple(
         zip(*[card_to_idx(c) for c in stack])
     )
+
+if __name__ == "__main__":
+    print("2 Player Interactive Mode:")
+    env = CribbageEnv(verbose=True)
+
+    state, reward, done, debug = env.reset()
+
+    while not done:
+
+        if env.phase < 2:
+            state, reward, done, debug = env.step(state.hand[0])
+        else:
+            state, reward, done, debug = env.step([])
+
+    import IPython; IPython.embed()
