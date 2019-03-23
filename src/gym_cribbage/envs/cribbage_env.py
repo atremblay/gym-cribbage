@@ -11,6 +11,8 @@ import gym
 import logging
 import numpy as np
 import random
+from collections import defaultdict
+
 
 SUITS = "♤♡♧♢"
 RANKS = ["A", 2, 3, 4, 5, 6, 7, 8, 9, 10, "J", "Q", "K"]
@@ -248,7 +250,8 @@ class CribbageEnv(gym.Env):
         self.discarded = Stack()
 
         # Randomly select the dealer. Initalize the player to be the same.
-        self.dealer = random.randint(0, self.n_players-1)
+        self.dealer = random.randint(0, self.n_players - 1)
+        self.logger.debug("Player {} has the crib".format(self.dealer))
         self.player = copy(self.dealer)
         self.last_player = copy(self.dealer)
 
@@ -259,6 +262,7 @@ class CribbageEnv(gym.Env):
         for i in range(self.n_players):
             for j in range(self._cards_per_hand):
                 self.hands[i].add_(self.deck.deal())
+            self.logger.debug("Player {}'s hand: {}".format(i, self.hands[i]))
 
         # Return the hand of the dealer.
         self.state = State(
@@ -298,7 +302,9 @@ class CribbageEnv(gym.Env):
 
         # The Deal.
         if self.phase == 0:
-
+            self.logger.debug(
+                "Player {} discards {} to the crib".format(self.player, card)
+            )
             # Move card from hand to crib.
             self.hands[self.player].discard(card)
             self.crib.add_(card)
@@ -336,7 +342,9 @@ class CribbageEnv(gym.Env):
 
         # The Play.
         elif self.phase == 1:
-
+            self.logger.debug(
+                "Player {} plays {}".format(self.player, card)
+            )
             # Move card from player's hand to table. Keep track of player's
             # played cards in "played", which we need for The Show.
             self.hands[self.player].discard(card)
@@ -546,27 +554,30 @@ def evaluate_cards(cards, starter=None, is_crib=False):
         cards = cards.add(starter)
 
     # List of all card combinations: 2 in n, 3 in n, ..., n in n
-    all_combinations = []
+    all_combinations = defaultdict(list)
     for i in range(2, len(cards) + 1):
-        all_combinations.extend(list(combinations(cards, i)))
+        all_combinations[i].extend(list(combinations(cards, i)))
 
 
     # Check for pairs. Check only the combinations of two cards
-    for combination in all_combinations:
-        if len(combination) == 2:
-            left, right = combination
+    for combination in all_combinations[2]:
+        left, right = combination
 
-            if left.rank_value == right.rank_value:
-                points += 2
+        if left.rank_value == right.rank_value:
+            points += 2
 
     # Check for suits, starting with full deck. Minimum 3 cards.
     # Since we reverse through all_combinations, finds the longest sequence.
     sequence_found = False
 
-    for combnation in reversed(all_combinations[1:]):
-        if is_sequence(combination):
-            points += len(combination)
-            sequence_found = True
+    for length in reversed(sorted(all_combinations.keys())):
+        if length < 3:
+            continue
+
+        for combination in all_combinations[length]:
+            if is_sequence(combination):
+                points += len(combination)
+                sequence_found = True
 
         if sequence_found:
             break
@@ -574,10 +585,11 @@ def evaluate_cards(cards, starter=None, is_crib=False):
     points += same_suit_points(cards_without_starter, starter, is_crib)
 
     # Check for 15s, starting with two card combinations.
-    for combination in all_combinations:
-        cards = list(sorted(combination))
-        if sum(c.value for c in cards) == 15:
-            points += 2
+    for length in sorted(all_combinations.keys()):
+        for combination in all_combinations[length]:
+            cards = list(sorted(combination))
+            if sum(c.value for c in cards) == 15:
+                points += 2
 
     # Check for cards with same suit as starter.
     if starter is not None:
