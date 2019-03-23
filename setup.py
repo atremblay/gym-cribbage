@@ -9,7 +9,7 @@ from setuptools import setup, find_namespace_packages
 setup(
     name='gym_cribbage',
     version='0.0.1',
-    install_requires=['gym', 'numpy'],  # And any other dependencies cribbage needs
+    install_requires=['gym', 'numpy', 'setuptools>=40.1.0'],  # And any other dependencies cribbage needs
     packages=find_namespace_packages(where='src'),
     package_dir={'': 'src'}
 )
