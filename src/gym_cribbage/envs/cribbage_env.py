@@ -20,7 +20,7 @@ RANKS = ["A", 2, 3, 4, 5, 6, 7, 8, 9, 10, "J", "Q", "K"]
 MAX_TABLE_VALUE = 31
 
 FORMAT = "[%(lineno)s: %(funcName)24s] %(message)s"
-#FORMAT = "[%(name)s] %(levelname)s: %(message)s"
+# FORMAT = "[%(name)s] %(levelname)s: %(message)s"
 
 # Starting the idx at 1 because 0 will be used as padding
 rank_to_idx = {r: i for i, r in enumerate(RANKS, 1)}
@@ -28,6 +28,7 @@ suit_to_idx = {s: i for i, s in enumerate(SUITS, 1)}
 
 # For debug information.
 logging.basicConfig(level=logging.WARN, format=FORMAT)
+
 
 class Card(object):
     """Card, french style"""
@@ -192,6 +193,7 @@ class State(object):
     3) The ID of the player who recieves this turn's reward.
     4) The phase of the game {0: the deal, 1: the play, 2: the show}.
     """
+
     def __init__(self, hand, hand_id, reward_id, phase):
         self.hand = hand
         self.hand_id = hand_id
@@ -294,7 +296,7 @@ class CribbageEnv(gym.Env):
             total is the cummulative value of the card played in the current
             play.
         """
-        if self.initialized == False:
+        if not self.initialized:
             raise Exception("Need to CribbageEnv.reset() before first step.")
 
         done = False
@@ -327,8 +329,10 @@ class CribbageEnv(gym.Env):
 
                 # Start next phase from the left of the dealer.
                 self._next_player(from_dealer=True)
-
-                self.logger.debug("Crib complete, move to The Play.")
+                # self.logger.debug("Crib: {}".format(self.crib))
+                self.logger.debug(
+                    f"Crib complete: {self.crib}  Move to The Play."
+                )
 
             else:
                 self._next_player()
@@ -481,7 +485,7 @@ class CribbageEnv(gym.Env):
             self.player = copy(self.dealer)
 
         self.player += 1
-        if self.player > self.n_players-1:
+        if self.player > self.n_players - 1:
             self.player = 0
 
         self.logger.debug("Player={}".format(self.player))
@@ -522,16 +526,20 @@ class CribbageEnv(gym.Env):
             starter=self.starter[0]
         )
 
+        self.logger.debug('SHOW: player {} earned {} points'.format(
+            self.player, points)
+        )
+
         if self.player == self.dealer:
-            points += evaluate_cards(
+            crib_points = evaluate_cards(
                 self.crib,
                 starter=self.starter[0],
                 is_crib=True
             )
-
-        self.logger.debug('SHOW: player {} earned {} points'.format(
-            self.player, points)
-        )
+            points += crib_points
+            self.logger.debug('SHOW CRIB: player {} earned {} points'.format(
+                self.player, points)
+            )
 
         return(points)
 
@@ -557,7 +565,6 @@ def evaluate_cards(cards, starter=None, is_crib=False):
     all_combinations = defaultdict(list)
     for i in range(2, len(cards) + 1):
         all_combinations[i].extend(list(combinations(cards, i)))
-
 
     # Check for pairs. Check only the combinations of two cards
     for combination in all_combinations[2]:
@@ -643,6 +650,7 @@ def stack_to_idx(stack):
     return tuple(
         zip(*[card_to_idx(c) for c in stack])
     )
+
 
 if __name__ == "__main__":
     print("2 Player Interactive Mode:")
