@@ -546,7 +546,7 @@ class CribbageEnv(gym.Env):
 
 def evaluate_cards(cards, starter=None, is_crib=False):
     """
-    This is to evaluate the number of points in a hand. Optionnally with the
+    This is to evaluate the number of points in a hand. Optionally with the
     knob
     """
 

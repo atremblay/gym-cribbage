@@ -13,7 +13,6 @@ from gym_cribbage.envs.cribbage_env import (
     SUITS,
     Stack,
     evaluate_cards,
-    CribbageEnv,
     card_to_idx,
     stack_to_idx
 )
