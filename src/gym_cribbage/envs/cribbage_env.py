@@ -338,7 +338,7 @@ class CribbageEnv(gym.Env):
                 self._next_player()
 
             self.state = State(
-                playable_hands[self.player],
+                Stack(playable_hands[self.player]),
                 self.player,
                 self.dealer,
                 self.phase
@@ -399,7 +399,7 @@ class CribbageEnv(gym.Env):
 
             # When self.phase == 2, playable_hands[self.player] will be empty.
             self.state = State(
-                playable_hands[self.player],
+                Stack(playable_hands[self.player]),
                 self.player,
                 self.last_player,
                 self.phase
@@ -418,7 +418,7 @@ class CribbageEnv(gym.Env):
             self.last_player = copy(self.player)
             self._next_player()
 
-            self.state = State([], self.player, self.last_player, self.phase)
+            self.state = State(Stack([]), self.player, self.last_player, self.phase)
 
         return(self.state, reward, done, debug)
 
