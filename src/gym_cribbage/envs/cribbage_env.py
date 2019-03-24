@@ -507,7 +507,7 @@ class CribbageEnv(gym.Env):
         Evaluates points for the last-played card during The Play.
         These calculations do not include the starter.
         """
-        points = evaluate_cards(self.table)
+        points = evaluate_table(self.table)
 
         self.logger.debug('PLAY: player {} earned {} points'.format(
             self.player, points)
@@ -542,6 +542,36 @@ class CribbageEnv(gym.Env):
             )
 
         return(points)
+
+
+def evaluate_table(cards):
+    points = 0
+
+    if sum(c.value for c in cards) == 15:
+        points += 2
+
+    # Pair points
+    pair_point = 0
+    for i in range(-2, -min(len(cards)+1, 5), -1):
+        if cards[-1].rank == cards[i].rank:
+            if i == -2:
+                pair_point = 2
+            elif i == -3:
+                pair_point = 6
+            elif i == -4:
+                pair_point = 12
+        else:
+            break
+
+    points += pair_point
+
+    # Run points
+    for i in reversed(range(-3, -len(cards)-1, -1)):
+        if is_sequence(cards[i:]):
+            points += len(cards[i:])
+            break
+
+    return points
 
 
 def evaluate_cards(cards, starter=None, is_crib=False):

@@ -13,6 +13,7 @@ from gym_cribbage.envs.cribbage_env import (
     SUITS,
     Stack,
     evaluate_cards,
+    evaluate_table,
     card_to_idx,
     stack_to_idx
 )
@@ -113,6 +114,98 @@ class CribbageEnvTest(unittest.TestCase):
         self.assertEqual(
             evaluate_cards(hand, starter=Card(RANKS[3], SUITS[0])), 5
         )
+
+    def test_evaluate_play(self):
+        table = Stack(
+            cards=[
+                Card(RANKS[7], SUITS[1]),
+                Card(RANKS[6], SUITS[1])
+            ]
+        )
+        self.assertEqual(
+            evaluate_table(table), 2
+        )
+
+        table = Stack(
+            cards=[
+                Card(RANKS[8], SUITS[3]),
+                Card(RANKS[8], SUITS[2]),
+                Card(RANKS[8], SUITS[1]),
+                Card(RANKS[8], SUITS[0])
+            ]
+        )
+        self.assertEqual(
+            evaluate_table(table), 12
+        )
+        table = Stack(
+            cards=[
+                Card(RANKS[7], SUITS[3]),
+                Card(RANKS[7], SUITS[2]),
+                Card(RANKS[7], SUITS[1])
+            ]
+        )
+        self.assertEqual(
+            evaluate_table(table), 6
+        )
+        table = Stack(
+            cards=[
+                Card(RANKS[6], SUITS[3]),
+                Card(RANKS[6], SUITS[2])
+            ]
+        )
+        self.assertEqual(
+            evaluate_table(table), 2
+        )
+
+        table = Stack(
+            cards=[
+                Card(RANKS[10], SUITS[3]),
+                Card(RANKS[4], SUITS[3]),
+                Card(RANKS[7], SUITS[3]),
+                Card(RANKS[7], SUITS[2]),
+                Card(RANKS[7], SUITS[1])
+            ]
+        )
+        self.assertEqual(
+            evaluate_table(table), 6
+        )
+        table = Stack(
+            cards=[
+                Card(RANKS[10], SUITS[3]),
+                Card(RANKS[4], SUITS[3]),
+                Card(RANKS[6], SUITS[3]),
+                Card(RANKS[6], SUITS[2])
+            ]
+        )
+        self.assertEqual(
+            evaluate_table(table), 2
+        )
+
+        # Run tests
+        table = Stack(
+            cards=[
+                Card(RANKS[8], SUITS[3]),
+                Card(RANKS[6], SUITS[3]),
+                Card(RANKS[4], SUITS[3]),
+                Card(RANKS[5], SUITS[3]),
+                Card(RANKS[7], SUITS[2])
+            ]
+        )
+        self.assertEqual(
+            evaluate_table(table), 5
+        )
+        table = Stack(
+            cards=[
+                Card(RANKS[8], SUITS[3]),
+                Card(RANKS[6], SUITS[3]),
+                Card(RANKS[4], SUITS[3]),
+                Card(RANKS[5], SUITS[3])
+            ]
+        )
+        self.assertEqual(
+            evaluate_table(table), 3
+        )
+
 
     # def test_cribbage_step(self):
 
