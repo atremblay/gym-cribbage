@@ -6,6 +6,7 @@
 
 import unittest
 import random
+import numpy as np
 
 from gym_cribbage.envs.cribbage_env import (
     is_sequence,
@@ -231,6 +232,34 @@ class CribbageEnvTest(unittest.TestCase):
                     done = True
 
             dealer = env.next_player(env.dealer)
+
+    def test_rank_suit_from_idx(self):
+
+        rank, suit = RANKS[10], SUITS[3]
+        rank_0, suit_0 = Card.rank_suit_from_idx(int(np.argwhere(Card(rank, suit).state == True)))
+        self.assertEqual(rank, rank_0)
+        self.assertEqual(suit, suit_0)
+
+        rank, suit = RANKS[4], SUITS[3]
+        rank_0, suit_0 = Card.rank_suit_from_idx(int(np.argwhere(Card(rank, suit).state == True)))
+        self.assertEqual(rank, rank_0)
+        self.assertEqual(suit, suit_0)
+
+        rank, suit = RANKS[7], SUITS[3]
+        rank_0, suit_0 = Card.rank_suit_from_idx(int(np.argwhere(Card(rank, suit).state == True)))
+        self.assertEqual(rank, rank_0)
+        self.assertEqual(suit, suit_0)
+
+        rank, suit = RANKS[7], SUITS[2]
+        rank_0, suit_0 = Card.rank_suit_from_idx(int(np.argwhere(Card(rank, suit).state == True)))
+        self.assertEqual(rank, rank_0)
+        self.assertEqual(suit, suit_0)
+
+        rank, suit = RANKS[7], SUITS[1]
+        rank_0, suit_0 = Card.rank_suit_from_idx(int(np.argwhere(Card(rank, suit).state == True)))
+        self.assertEqual(rank, rank_0)
+        self.assertEqual(suit, suit_0)
+
 
 
     #     cribbage = CribbageEnv()
