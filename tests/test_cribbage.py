@@ -214,7 +214,7 @@ class CribbageEnvTest(unittest.TestCase):
         env = CribbageEnv(verbose=True)
         winner = None
         rewards = [[], []]
-        while not winner:
+        while winner is None:
             state, reward, done, debug = env.reset()
 
             while not done:
