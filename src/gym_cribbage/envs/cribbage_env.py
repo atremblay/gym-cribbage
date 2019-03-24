@@ -229,7 +229,7 @@ class CribbageEnv(gym.Env):
 
         self.initialized = False
 
-    def reset(self):
+    def reset(self, dealer=None):
         """
         Shuffles the deck, deals cards to each of the n_player's hands, and
         randomly selects the dealer. Each user recieves the appropriate
@@ -252,7 +252,7 @@ class CribbageEnv(gym.Env):
         self.discarded = Stack()
 
         # Randomly select the dealer. Initalize the player to be the same.
-        self.dealer = random.randint(0, self.n_players - 1)
+        self.dealer = random.randint(0, self.n_players - 1) if dealer is None else dealer
         self.logger.debug("Player {} has the crib".format(self.dealer))
         self.player = copy(self.dealer)
         self.last_player = copy(self.dealer)
@@ -328,14 +328,14 @@ class CribbageEnv(gym.Env):
                     self.logger.debug("Two for his heels!")
 
                 # Start next phase from the left of the dealer.
-                self._next_player(from_dealer=True)
+                self.player = self.next_player(self.player, from_dealer=True)
                 # self.logger.debug("Crib: {}".format(self.crib))
                 self.logger.debug(
                     f"Crib complete: {self.crib}  Move to The Play."
                 )
 
             else:
-                self._next_player()
+                self.player = self.next_player(self.player)
 
             self.state = State(
                 Stack(playable_hands[self.player]),
@@ -378,7 +378,7 @@ class CribbageEnv(gym.Env):
                 if remaining_cards == 0:
                     self.logger.debug("No cards left, time for The Show.")
                     self.phase = 2
-                    self._next_player(from_dealer=True)
+                    self.player = self.next_player(self.player, from_dealer=True)
 
                 # Reset the table and playable cards.
                 else:
@@ -387,13 +387,13 @@ class CribbageEnv(gym.Env):
                             self.table_value, remaining_cards)
                     )
                     self._reset_table()
-                    self._next_player()
+                    self.player = self.next_player(self.player)
                     counts, playable_hands = self._count_playable_cards()
                     self._next_avail_player(counts, playable_hands)
 
             # Go! Skip to the next player who has a playable hand.
             else:
-                self._next_player()
+                self.player = self.next_player(self.player)
 
                 self._next_avail_player(counts, playable_hands)
 
@@ -416,7 +416,7 @@ class CribbageEnv(gym.Env):
                 done = True
 
             self.last_player = copy(self.player)
-            self._next_player()
+            self.player = self.next_player(self.player)
 
             self.state = State(Stack([]), self.player, self.last_player, self.phase)
 
@@ -482,22 +482,23 @@ class CribbageEnv(gym.Env):
                     playable_hands[self.player],
                     self.hands[self.player])
                 )
-                self._next_player()
+                self.player = self.next_player(self.player)
 
 
-    def _next_player(self, from_dealer=False):
+    def next_player(self, player, from_dealer=False):
         """
         Increments through the players. Increments forever, but can be set
         to start from the dealer.
         """
         if from_dealer:
-            self.player = copy(self.dealer)
+            player = copy(self.dealer)
 
-        self.player += 1
-        if self.player > self.n_players - 1:
-            self.player = 0
+        player += 1
+        if player > self.n_players - 1:
+            player = 0
 
         self.logger.debug("Player={}".format(self.player))
+        return player
 
     def _reset_table(self):
         """

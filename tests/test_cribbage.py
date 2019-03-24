@@ -212,10 +212,10 @@ class CribbageEnvTest(unittest.TestCase):
 
         print("2 Player Interactive Mode:")
         env = CribbageEnv(verbose=True)
-        winner = None
+        winner, dealer = None, None
         rewards = [[], []]
         while winner is None:
-            state, reward, done, debug = env.reset()
+            state, reward, done, debug = env.reset(dealer)
 
             while not done:
 
@@ -229,6 +229,8 @@ class CribbageEnvTest(unittest.TestCase):
                 if sum(rewards[env.last_player]) >= 121:
                     winner = env.last_player
                     done = True
+
+            dealer = env.next_player(env.dealer)
 
 
     #     cribbage = CribbageEnv()
