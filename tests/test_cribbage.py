@@ -5,6 +5,7 @@
 # @Last Modified time: 2019-03-09 14:07:20
 
 import unittest
+import random
 
 from gym_cribbage.envs.cribbage_env import (
     is_sequence,
@@ -15,6 +16,7 @@ from gym_cribbage.envs.cribbage_env import (
     evaluate_cards,
     evaluate_table,
     card_to_idx,
+    CribbageEnv,
     stack_to_idx
 )
 
@@ -206,8 +208,28 @@ class CribbageEnvTest(unittest.TestCase):
             evaluate_table(table), 3
         )
 
+    def test_cribbage_step(self):
 
-    # def test_cribbage_step(self):
+        print("2 Player Interactive Mode:")
+        env = CribbageEnv(verbose=True)
+        winner = None
+        rewards = [[], []]
+        while not winner:
+            state, reward, done, debug = env.reset()
+
+            while not done:
+
+                if env.phase < 2:
+                    state, reward, done, debug = env.step(state.hand[random.randint(0, len(state.hand)-1)])
+                else:
+                    state, reward, done, debug = env.step([])
+
+                rewards[env.last_player].append(reward)
+
+                if sum(rewards[env.last_player]) >= 121:
+                    winner = env.last_player
+                    done = True
+
 
     #     cribbage = CribbageEnv()
     #     cribbage.reset()

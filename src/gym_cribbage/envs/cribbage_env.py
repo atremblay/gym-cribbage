@@ -389,18 +389,13 @@ class CribbageEnv(gym.Env):
                     self._reset_table()
                     self._next_player()
                     counts, playable_hands = self._count_playable_cards()
+                    self._next_avail_player(counts, playable_hands)
 
             # Go! Skip to the next player who has a playable hand.
             else:
                 self._next_player()
 
-                while counts[self.player] == 0:
-                    self.logger.debug("Go! Skip player {}, hand={}/{}".format(
-                        self.player,
-                        playable_hands[self.player],
-                        self.hands[self.player])
-                    )
-                    self._next_player()
+                self._next_avail_player(counts, playable_hands)
 
             # When self.phase == 2, playable_hands[self.player] will be empty.
             self.state = State(
@@ -475,6 +470,20 @@ class CribbageEnv(gym.Env):
         self.logger.debug('Total remaining cards={}'.format(remaining_cards))
 
         return(remaining_cards)
+
+    def _next_avail_player(self, counts, playable_hands):
+        """
+        Finds the next available player if has any
+        """
+        if sum(counts) != 0:
+            while counts[self.player] == 0:
+                self.logger.debug("Go! Skip player {}, hand={}/{}".format(
+                    self.player,
+                    playable_hands[self.player],
+                    self.hands[self.player])
+                )
+                self._next_player()
+
 
     def _next_player(self, from_dealer=False):
         """
