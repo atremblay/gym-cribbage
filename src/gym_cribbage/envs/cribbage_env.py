@@ -315,6 +315,7 @@ class CribbageEnv(gym.Env):
             # Keep track of number of cards in play.
             counts, playable_hands = self._count_playable_cards()
             reward = 0
+            self.last_player = copy(self.player)
 
             # The crib is complete.
             if sum(counts) / float(self.n_players) == 4:
@@ -341,7 +342,7 @@ class CribbageEnv(gym.Env):
             self.state = State(
                 Stack(playable_hands[self.player]),
                 self.player,
-                self.dealer,
+                self.last_player,
                 self.phase
             )
 
