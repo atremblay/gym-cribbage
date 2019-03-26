@@ -369,8 +369,11 @@ class CribbageEnv(gym.Env):
                 # Reward player for placing the last card.
                 if self.table_value == MAX_TABLE_VALUE:
                     reward += 2
+                    self.logger.debug("reward+2 for MAX_TABLE_VALUE.")
                 else:
                     reward += 1
+                    self.logger.debug("reward+1 for last player.")
+
 
                 remaining_cards = self._count_remaining_cards()
 
