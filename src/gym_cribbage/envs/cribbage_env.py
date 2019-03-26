@@ -232,7 +232,7 @@ class CribbageEnv(gym.Env):
     def reset(self, dealer=None):
         """
         Shuffles the deck, deals cards to each of the n_player's hands, and
-        randomly selects the dealer. Each user recieves the appropriate
+        randomly selects the dealer. Each user receives the appropriate
         number of cards.
         """
         self.deck = Deck()
@@ -259,6 +259,7 @@ class CribbageEnv(gym.Env):
 
         self.table_value = 0
         self.phase = 0  # 0: the deal, 1: the play, 2: the show.
+        self.prev_phase = 0  # To catch phase transitions
 
         # Deal cards to all users.
         for i in range(self.n_players):
@@ -314,6 +315,7 @@ class CribbageEnv(gym.Env):
             # Keep track of number of cards in play.
             counts, playable_hands = self._count_playable_cards()
             reward = 0
+            self.last_player = copy(self.player)
 
             # The crib is complete.
             if sum(counts) / float(self.n_players) == 4:
@@ -340,7 +342,7 @@ class CribbageEnv(gym.Env):
             self.state = State(
                 Stack(playable_hands[self.player]),
                 self.player,
-                self.dealer,
+                self.last_player,
                 self.phase
             )
 
@@ -405,6 +407,8 @@ class CribbageEnv(gym.Env):
                 self.phase
             )
 
+            self.prev_phase = 1
+
         # The Show.
         elif self.phase == 2:
 
@@ -419,6 +423,8 @@ class CribbageEnv(gym.Env):
             self.player = self.next_player(self.player)
 
             self.state = State(Stack([]), self.player, self.last_player, self.phase)
+
+            self.prev_phase = 2
 
         return(self.state, reward, done, debug)
 
