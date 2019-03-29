@@ -109,7 +109,10 @@ class Deck(object):
         random.shuffle(self.cards)
 
     def deal(self):
-        return self.cards.pop(0)
+        try:
+            return self.cards.pop(0)
+        except IndexError:
+            return None
 
     def remove(self, card):
         new_cards = []
@@ -134,7 +137,7 @@ class Stack(object):
 
     @staticmethod
     def from_stack(stack):
-        return Stack(cards=stack.cards)
+        return Stack(cards=stack.cards.copy())
 
     def __init__(self, cards=None):
         super(Stack, self).__init__()
