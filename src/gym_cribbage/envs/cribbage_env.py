@@ -69,12 +69,13 @@ class Card(object):
         return s
 
     @property
-    def short_state(self):
+    def compact_state(self):
         # [0:3] encode suit, [4:16] encode rank
-        s = np.zeros(4 + 13)
-        s[SUITS.index(self.suit)] = 1
-        s[RANKS.index(self.rank) + 4] = 1
-        return s
+        suit = np.zeros(4)
+        rank = np.zeros(13)
+        suit[SUITS.index(self.suit)] = 1
+        rank[RANKS.index(self.rank)] = 1
+        return suit, rank
 
     def __repr__(self):
         return "{}{}".format(self.rank, self.suit)
@@ -108,7 +109,24 @@ class Deck(object):
         random.shuffle(self.cards)
 
     def deal(self):
-        return self.cards.pop(0)
+        try:
+            return self.cards.pop(0)
+        except IndexError:
+            return None
+
+    def remove(self, card):
+        new_cards = []
+        for c in self.cards:
+            if c != card:
+                new_cards.append(c)
+        new_deck = Deck()
+        new_deck.cards = new_cards
+        return new_deck
+
+    def remove_(self, card):
+        for i, c in enumerate(self.cards):
+            if c == card:
+                self.cards.pop(i)
 
     def __len__(self):
         return len(self.cards)
@@ -119,7 +137,7 @@ class Stack(object):
 
     @staticmethod
     def from_stack(stack):
-        return Stack(cards=stack.cards)
+        return Stack(cards=stack.cards.copy())
 
     def __init__(self, cards=None):
         super(Stack, self).__init__()
@@ -149,15 +167,22 @@ class Stack(object):
         return s
 
     @property
-    def short_state(self):
+    def compact_state(self):
         """
         Possibly for state aggregation.
         """
         # [0:3] encode suit, [4:16] encode rank
-        s = np.zeros(4 + 13)
-        for card in self.cards:
-            s += card.state
-        return s
+        suit = np.zeros((4, len(self)), dtype=np.float32)
+        rank = np.zeros((13, len(self)), dtype=np.float32)
+        for i, card in enumerate(self.cards):
+            s, r = card.compact_state
+            suit[:, i] = s
+            rank[:, i] = r
+
+        argsort = np.argsort([c.rank_value for c in self])
+        suit = suit[:, argsort]
+        rank = rank[:, argsort]
+        return suit, rank
 
     def add(self, card):
         if not isinstance(card, Card):
