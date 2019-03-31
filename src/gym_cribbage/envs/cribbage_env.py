@@ -77,6 +77,12 @@ class Card(object):
         rank[RANKS.index(self.rank)] = 1
         return suit, rank
 
+    @staticmethod
+    def rank_suit_from_idx(idx):
+        idx_rank = idx % 13
+        idx_suit = (idx-idx_rank)//13
+        return RANKS[idx_rank], SUITS[idx_suit]
+
     def __repr__(self):
         return "{}{}".format(self.rank, self.suit)
 
