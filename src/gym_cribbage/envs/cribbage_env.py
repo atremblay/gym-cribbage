@@ -17,10 +17,22 @@ from collections import defaultdict
 SUITS = "♤♡♧♢"
 RANKS = ["A", 2, 3, 4, 5, 6, 7, 8, 9, 10, "J", "Q", "K"]
 
-MAX_TABLE_VALUE = 31
+# Used to render player-specific stats.
+TABLE_MP ="""--- Player1 Player2 Player3 Player4
+Hand {hand1} {hand2} {hand3} {hand4}
+Played {played1} {played2} {played3} {played4}
+Score {score1} {score2} {score3} {score4}
+--- --- --- --- ---"""
+ROW_MP = "{:12s} {:20s} {:20s} {:20s} {:20s}"
 
+# Used to render the common space.
+TABLE = """Crib {crib}
+Table {table}
+Discarded {discarded}"""
+ROW = "{:12s} {:60s}"
+
+MAX_TABLE_VALUE = 31
 FORMAT = "[%(lineno)s: %(funcName)24s] %(message)s"
-# FORMAT = "[%(name)s] %(levelname)s: %(message)s"
 
 # Starting the idx at 1 because 0 will be used as padding
 rank_to_idx = {r: i for i, r in enumerate(RANKS, 1)}
@@ -201,7 +213,10 @@ class Stack(object):
         self.cards.append(card)
 
     def __repr__(self):
-        return " | ".join([str(c) for c in self.cards])
+        if len(self.cards) == 0:
+            return("empty")
+        else:
+            return("-".join([str(c) for c in self.cards]))
 
     def __iter__(self):
         for card in self.cards:
@@ -276,6 +291,9 @@ class CribbageEnv(gym.Env):
 
         # Stores the cards played by each player (in order) for The Play.
         self.table = Stack()
+
+        # Stored the score of each player.
+        self.scores = [0 for i in range(self.n_players)]
 
         # Stores the crib generated during The Deal.
         self.crib = Stack()
@@ -460,13 +478,57 @@ class CribbageEnv(gym.Env):
 
             self.prev_phase = 2
 
+        # Keep track of the player's total score.
+        self.scores[self.last_player] += reward
+
         return(self.state, reward, done, debug)
 
     def render(self, mode='human'):
-        pass
+        """Renders a table of the current game."""
+        # Get information from each player.
+        mp_dict = {}
+        mp_dict.update(self._get_item_dict("hand", self.hands))
+        mp_dict.update(self._get_item_dict("played", self.played))
+        mp_dict.update(self._get_item_dict("score", self.scores))
+
+        # Common information.
+        table_dict = {"crib": self.crib, "table": self.table,
+                      "discarded": self.discarded}
+
+        table_mp = TABLE_MP.format(**mp_dict)
+        table = TABLE.format(**table_dict)
+
+        # Split input data by row and then on spaces
+        rows_mp = self._get_rows(table_mp)
+        rows = self._get_rows(table)
+
+        # Print each row using the associated format
+        for row in rows_mp:
+            print(ROW_MP.format(*row))
+        for row in rows:
+            print(ROW.format(*row))
 
     def close(self):
         pass
+
+    def _get_rows(self, iterable):
+        """Split input data by row and then on spaces."""
+        return([ line.strip().split(' ') for line in iterable.split('\n') ])
+
+    def _get_item_dict(self, name, items):
+        """
+        Used for getting dicts representing the internal state of the
+        environment, for the render function.
+        """
+        item_dict = {
+            "{}{}".format(name, i+1): items[i] for i in range(self.n_players)}
+        if self.n_players < 4:
+            empty_dict = {
+                "{}{}".format(name, i+1): "N/A" for i in range(
+                    self.n_players, 4)}
+            item_dict.update(empty_dict)
+
+        return(item_dict)
 
     def _update_table_value(self):
         """
@@ -744,5 +806,7 @@ if __name__ == "__main__":
             state, reward, done, debug = env.step(state.hand[0])
         else:
             state, reward, done, debug = env.step([])
+
+        env.render()
 
     import IPython; IPython.embed()
