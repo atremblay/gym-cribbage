@@ -264,6 +264,9 @@ class CribbageEnv(gym.Env):
         # Reset the persistant scores of all players.
         self.scores = np.zeros(self.n_players, dtype=np.int8)
 
+        # Allows the user to see whether we are dealing with a new hand.
+        self.new_hand = True
+
         # Pick dealer, clear table, shuffle, deal cards.
         reward, done, _ = self._reset_hand(dealer=dealer)
 
@@ -293,7 +296,7 @@ class CribbageEnv(gym.Env):
             raise Exception("Need to CribbageEnv.reset() before first step.")
 
         done = False
-        hand_done = False
+        self.new_hand = False
         debug = "step!"
 
         # The Deal.
@@ -426,7 +429,7 @@ class CribbageEnv(gym.Env):
 
             # Went around the circle once. This hand is over.
             if self.player == self.dealer:
-                hand_done = True
+                self.new_hand = True
 
             self.last_player = copy(self.player)
             self.player = self.next_player(self.player)
@@ -451,10 +454,11 @@ class CribbageEnv(gym.Env):
             done = True
 
             # Forces user to reset the environment for the next game.
+            self.new_hand = False
             self.initialized = False
 
         # If we go around the circle once during Phase 2.
-        elif hand_done:
+        elif self.new_hand:
 
             # The next hand is dealt by the person next to the dealer.
             next_dealer = self.next_player(self.dealer)
@@ -849,5 +853,5 @@ if __name__ == "__main__":
             state, reward, done, debug = env.step(state.hand[0])
         else:
             state, reward, done, debug = env.step([])
-
+        print(env.new_hand)
         env.render()
