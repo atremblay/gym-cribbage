@@ -382,7 +382,8 @@ class CribbageEnv(gym.Env):
                 if remaining_cards == 0:
                     self.logger.debug("No cards left, time for The Show.")
                     self.phase = 2
-                    self.player = self.next_player(self.player, from_dealer=True)
+                    self.player = self.next_player(self.player, 
+                                                   from_dealer=True)
 
                 # Reset the table and playable cards.
                 else:
@@ -454,9 +455,27 @@ class CribbageEnv(gym.Env):
 
         # If we go around the circle once during Phase 2.
         elif hand_done:
-            self._reset_hand()
+
+            # The next hand is dealt by the person next to the dealer.
+            next_dealer = self.next_player(self.dealer)
+            self._reset_hand(dealer=next_dealer)
 
         return(self.state, reward, done, debug)
+
+    def next_player(self, player, from_dealer=False):
+        """
+        Increments through the players. Increments forever, but can be set
+        to start from the dealer.
+        """
+        if from_dealer:
+            player = copy(self.dealer)
+
+        player += 1
+        if player > self.n_players - 1:
+            player = 0
+
+        self.logger.debug("Player={}".format(self.player))
+        return player
 
     def render(self, mode='human'):
         """Renders a table of the current game."""
@@ -567,22 +586,6 @@ class CribbageEnv(gym.Env):
                     self.hands[self.player])
                 )
                 self.player = self.next_player(self.player)
-
-
-    def next_player(self, player, from_dealer=False):
-        """
-        Increments through the players. Increments forever, but can be set
-        to start from the dealer.
-        """
-        if from_dealer:
-            player = copy(self.dealer)
-
-        player += 1
-        if player > self.n_players - 1:
-            player = 0
-
-        self.logger.debug("Player={}".format(self.player))
-        return player
 
     def _reset_table(self):
         """
