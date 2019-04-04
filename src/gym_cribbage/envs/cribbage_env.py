@@ -406,7 +406,7 @@ class CribbageEnv(gym.Env):
                 if remaining_cards == 0:
                     self.logger.debug("No cards left, time for The Show.")
                     self.phase = 2
-                    self.player = self.next_player(self.player, 
+                    self.player = self.next_player(self.player,
                                                    from_dealer=True)
 
                 # Reset the table and playable cards.
@@ -671,7 +671,7 @@ class CribbageEnv(gym.Env):
         self.state = State(
             self.hands[self.player],
             self.player,
-            None,
+            self.player,
             self.phase,
             player_score,
             opponent_scores
