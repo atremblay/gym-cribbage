@@ -11,35 +11,13 @@ import logging
 import numpy as np
 import random
 from collections import defaultdict
-
-
-SUITS = "♤♡♧♢"
-RANKS = ["A", 2, 3, 4, 5, 6, 7, 8, 9, 10, "J", "Q", "K"]
-
-# Used to render player-specific stats.
-TABLE_MP ="""--- Player1 Player2 Player3 Player4
-Hand {hand1} {hand2} {hand3} {hand4}
-Played {played1} {played2} {played3} {played4}
-Score {score1} {score2} {score3} {score4}
---- --- --- --- ---"""
-ROW_MP = "{:12s} {:20s} {:20s} {:20s} {:20s}"
-
-# Used to render the common space.
-TABLE = """Crib {crib}
-Table {table}
-Discarded {discarded}"""
-ROW = "{:12s} {:60s}"
-
-MAX_TABLE_VALUE = 31
-MAX_ROUND_VALUE = 121
-FORMAT = "[%(lineno)s: %(funcName)24s] %(message)s"
-
-# Starting the idx at 1 because 0 will be used as padding
-rank_to_idx = {r: i for i, r in enumerate(RANKS, 1)}
-suit_to_idx = {s: i for i, s in enumerate(SUITS, 1)}
+from constants import (SUITS, RANKS, RANK_TO_IDX, SUIT_TO_IDX,
+                        TABLE_MP, ROW_MP, TABLE, ROW,
+                        MAX_TABLE_VALUE, MAX_ROUND_VALUE)
 
 # For debug information.
-logging.basicConfig(level=logging.WARN, format=FORMAT)
+logging.basicConfig(
+    level=logging.WARN, format="[%(lineno)s: %(funcName)24s] %(message)s")
 
 
 class Card(object):
@@ -847,7 +825,7 @@ def same_suit_points(hand, knob, is_crib=False):
 
 
 def card_to_idx(card):
-    return (rank_to_idx[card.rank], suit_to_idx[card.suit])
+    return (RANK_TO_IDX[card.rank], SUIT_TO_IDX[card.suit])
 
 
 def stack_to_idx(stack):
@@ -870,5 +848,3 @@ if __name__ == "__main__":
             state, reward, done, debug = env.step([])
 
         env.render()
-
-    import IPython; IPython.embed()
