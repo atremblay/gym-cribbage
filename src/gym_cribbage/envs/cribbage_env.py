@@ -863,9 +863,8 @@ def stack_to_idx(stack):
 
 
 if __name__ == "__main__":
-    print("2 Player Interactive Mode:")
-    env = CribbageEnv(verbose=True)
 
+    env = CribbageEnv(verbose=True)
     state, reward, done, debug = env.reset()
 
     while not done:
@@ -874,5 +873,4 @@ if __name__ == "__main__":
             state, reward, done, debug = env.step(state.hand[0])
         else:
             state, reward, done, debug = env.step([])
-        print(env.new_hand)
         env.render()
