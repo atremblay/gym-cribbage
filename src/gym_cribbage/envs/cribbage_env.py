@@ -293,7 +293,7 @@ class CribbageEnv(gym.Env):
         self.logger.debug("New Game!")
 
         # Reset the persistant scores of all players.
-        self.scores = np.zeros(self.n_players, dtype=np.int8)
+        self.scores = np.zeros(self.n_players, dtype=np.uint8)
 
         # Allows the user to see whether we are dealing with a new hand.
         self.new_hand = True
@@ -368,7 +368,6 @@ class CribbageEnv(gym.Env):
 
             # Keep track of the player's total score.
             self.scores[self.last_player] += reward
-
             player_score, opponent_scores = self._get_scores()
             self.state = State(
                 Stack(playable_hands[self.player]),
@@ -455,6 +454,7 @@ class CribbageEnv(gym.Env):
         # The Show.
         elif self.phase == 2:
 
+
             # Calculate points for self.player.
             reward = self._evaluate_show()
 
@@ -467,7 +467,6 @@ class CribbageEnv(gym.Env):
 
             # Keep track of the player's total score.
             self.scores[self.last_player] += reward
-
             player_score, opponent_scores = self._get_scores()
             self.state = State(
                 Stack([]),
@@ -481,7 +480,7 @@ class CribbageEnv(gym.Env):
             self.prev_phase = 2
 
         # If any player, at any time, gets a winning amount of points.
-        if any(self.scores > MAX_ROUND_VALUE):
+        if any(self.scores >= MAX_ROUND_VALUE):
             done = True
 
             # Forces user to reset the environment for the next game.
