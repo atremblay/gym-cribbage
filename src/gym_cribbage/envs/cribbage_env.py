@@ -211,6 +211,16 @@ class Stack(object):
             raise ValueError("Can only add card to a hand.")
         self.cards.append(card)
 
+    def remove(self, card):
+        if not isinstance(card, Card):
+            raise ValueError("Can only add card to a hand.")
+        return Stack(cards=[c for c in self.cards if c != card])
+
+    def remove_(self, card):
+        if not isinstance(card, Card):
+            raise ValueError("Can only add card to a hand.")
+        self.cards = [c for c in self.cards if c != card]
+
     def __repr__(self):
         if len(self.cards) == 0:
             return("empty")
