@@ -368,7 +368,6 @@ class CribbageEnv(gym.Env):
 
             # Keep track of the player's total score.
             self.scores[self.last_player] += reward
-            assert (self.scores>=0).all()
             player_score, opponent_scores = self._get_scores()
             self.state = State(
                 Stack(playable_hands[self.player]),
@@ -390,7 +389,6 @@ class CribbageEnv(gym.Env):
             self.played[self.player].add_(card)
             self.table.add_(card)
             reward = self._evaluate_play()
-            assert reward>=0
             self._update_table_value()
 
             # Check to see who can play next.
@@ -439,7 +437,6 @@ class CribbageEnv(gym.Env):
 
             # Keep track of the player's total score.
             self.scores[self.last_player] += reward
-            assert (self.scores>=0).all()
 
             # When self.phase == 2, playable_hands[self.player] will be empty.
             player_score, opponent_scores = self._get_scores()
@@ -460,7 +457,6 @@ class CribbageEnv(gym.Env):
 
             # Calculate points for self.player.
             reward = self._evaluate_show()
-            assert reward>=0
 
             # Went around the circle once. This hand is over.
             if self.player == self.dealer:
@@ -471,7 +467,6 @@ class CribbageEnv(gym.Env):
 
             # Keep track of the player's total score.
             self.scores[self.last_player] += reward
-            assert (self.scores>=0).all()
             player_score, opponent_scores = self._get_scores()
             self.state = State(
                 Stack([]),
