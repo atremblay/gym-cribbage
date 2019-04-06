@@ -483,7 +483,7 @@ class CribbageEnv(gym.Env):
 
             # The next hand is dealt by the person next to the dealer.
             next_dealer = self.next_player(self.dealer)
-            self._reset_hand(dealer=next_dealer)
+            self._reset_hand(dealer=next_dealer, reward_id=self.state.reward_id)
 
         return(self.state, reward, done, debug)
 
@@ -624,7 +624,7 @@ class CribbageEnv(gym.Env):
         self.table_value = 0
         self.table = Stack()
 
-    def _reset_hand(self, dealer=None):
+    def _reset_hand(self, dealer=None, reward_id=None):
         """
         All the steps required to start a new hand. Shuffles the deck, deals
         cards to each of the n_player's hands, and randomly selects the
@@ -671,7 +671,7 @@ class CribbageEnv(gym.Env):
         self.state = State(
             self.hands[self.player],
             self.player,
-            self.player,
+            reward_id,
             self.phase,
             player_score,
             opponent_scores
