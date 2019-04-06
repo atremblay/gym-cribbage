@@ -390,6 +390,7 @@ class CribbageEnv(gym.Env):
             self.played[self.player].add_(card)
             self.table.add_(card)
             reward = self._evaluate_play()
+            assert reward>=0
             self._update_table_value()
 
             # Check to see who can play next.
@@ -455,8 +456,10 @@ class CribbageEnv(gym.Env):
         # The Show.
         elif self.phase == 2:
 
+
             # Calculate points for self.player.
             reward = self._evaluate_show()
+            assert reward>=0
 
             # Went around the circle once. This hand is over.
             if self.player == self.dealer:
