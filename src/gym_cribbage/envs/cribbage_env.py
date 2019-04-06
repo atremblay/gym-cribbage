@@ -293,7 +293,7 @@ class CribbageEnv(gym.Env):
         self.logger.debug("New Game!")
 
         # Reset the persistant scores of all players.
-        self.scores = np.zeros(self.n_players, dtype=np.int8)
+        self.scores = np.zeros(self.n_players, dtype=np.uint8)
 
         # Allows the user to see whether we are dealing with a new hand.
         self.new_hand = True
