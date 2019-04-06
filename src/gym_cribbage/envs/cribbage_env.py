@@ -485,7 +485,7 @@ class CribbageEnv(gym.Env):
             self.prev_phase = 2
 
         # If any player, at any time, gets a winning amount of points.
-        if any(self.scores > MAX_ROUND_VALUE):
+        if any(self.scores >= MAX_ROUND_VALUE):
             done = True
 
             # Forces user to reset the environment for the next game.
