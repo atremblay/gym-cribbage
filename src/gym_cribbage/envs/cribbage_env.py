@@ -4,7 +4,6 @@
 # @Last Modified by:   Joseph D Viviano
 # @Last Modified time: 2019-03-22 19:51:20
 
-
 from copy import copy
 from itertools import product, combinations
 import gym
@@ -13,33 +12,33 @@ import numpy as np
 import random
 from collections import defaultdict
 
-
 SUITS = "♤♡♧♢"
 RANKS = ["A", 2, 3, 4, 5, 6, 7, 8, 9, 10, "J", "Q", "K"]
 
-# Used to render player-specific stats.
-TABLE_MP ="""--- Player1 Player2 Player3 Player4
+# Starting the idx at 1 because 0 will be used as padding
+RANK_TO_IDX = {r: i for i, r in enumerate(RANKS, 1)}
+SUIT_TO_IDX = {s: i for i, s in enumerate(SUITS, 1)}
+
+# Render: Used to render player-specific stats.
+TABLE_MP = """--- Player1 Player2 Player3 Player4
 Hand {hand1} {hand2} {hand3} {hand4}
 Played {played1} {played2} {played3} {played4}
 Score {score1} {score2} {score3} {score4}
 --- --- --- --- ---"""
 ROW_MP = "{:12s} {:20s} {:20s} {:20s} {:20s}"
 
-# Used to render the common space.
+# Render: Used to render the in-play cards.
 TABLE = """Crib {crib}
 Table {table}
 Discarded {discarded}"""
 ROW = "{:12s} {:60s}"
 
-MAX_TABLE_VALUE = 31
-FORMAT = "[%(lineno)s: %(funcName)24s] %(message)s"
-
-# Starting the idx at 1 because 0 will be used as padding
-rank_to_idx = {r: i for i, r in enumerate(RANKS, 1)}
-suit_to_idx = {s: i for i, s in enumerate(SUITS, 1)}
+MAX_TABLE_VALUE = 31  # Max points allowed before hand reset.
+MAX_ROUND_VALUE = 121  # Max points allowed before game ends.
 
 # For debug information.
-logging.basicConfig(level=logging.WARN, format=FORMAT)
+logging.basicConfig(
+    level=logging.WARN, format="[%(lineno)s: %(funcName)24s] %(message)s")
 
 
 class Card(object):
@@ -212,6 +211,16 @@ class Stack(object):
             raise ValueError("Can only add card to a hand.")
         self.cards.append(card)
 
+    def remove(self, card):
+        if not isinstance(card, Card):
+            raise ValueError("Can only add card to a hand.")
+        return Stack(cards=[c for c in self.cards if c != card])
+
+    def remove_(self, card):
+        if not isinstance(card, Card):
+            raise ValueError("Can only add card to a hand.")
+        self.cards = [c for c in self.cards if c != card]
+
     def __repr__(self):
         if len(self.cards) == 0:
             return("empty")
@@ -240,12 +249,14 @@ class State(object):
     4) The phase of the game {0: the deal, 1: the play, 2: the show}.
     """
 
-    def __init__(self, hand, hand_id, reward_id, phase):
+    def __init__(self, hand, hand_id, reward_id, phase,
+                 player_score, opponent_score):
         self.hand = hand
         self.hand_id = hand_id
         self.reward_id = reward_id
         self.phase = phase
-
+        self.player_score = player_score
+        self.opponent_score = opponent_score
 
 class CribbageEnv(gym.Env):
     """
@@ -277,56 +288,22 @@ class CribbageEnv(gym.Env):
 
     def reset(self, dealer=None):
         """
-        Shuffles the deck, deals cards to each of the n_player's hands, and
-        randomly selects the dealer. Each user receives the appropriate
-        number of cards.
+        Resets the hand, additionally clearing the scoreboard.
         """
-        self.deck = Deck()
+        self.logger.debug("New Game!")
 
-        # Stores the playable cards in each player's hand.
-        self.hands = [Stack() for i in range(self.n_players)]
+        # Reset the persistant scores of all players.
+        self.scores = np.zeros(self.n_players, dtype=np.uint8)
 
-        # Stores the cards played by each player.
-        self.played = [Stack() for i in range(self.n_players)]
+        # Allows the user to see whether we are dealing with a new hand.
+        self.new_hand = True
 
-        # Stores the cards played by each player (in order) for The Play.
-        self.table = Stack()
-
-        # Stored the score of each player.
-        self.scores = [0 for i in range(self.n_players)]
-
-        # Stores the crib generated during The Deal.
-        self.crib = Stack()
-        self.starter = Stack()
-        self.discarded = Stack()
-
-        # Randomly select the dealer. Initalize the player to be the same.
-        self.dealer = random.randint(0, self.n_players - 1) if dealer is None else dealer
-        self.logger.debug("Player {} has the crib".format(self.dealer))
-        self.player = copy(self.dealer)
-        self.last_player = copy(self.dealer)
-
-        self.table_value = 0
-        self.phase = 0  # 0: the deal, 1: the play, 2: the show.
-        self.prev_phase = 0  # To catch phase transitions
-
-        # Deal cards to all users.
-        for i in range(self.n_players):
-            for j in range(self._cards_per_hand):
-                self.hands[i].add_(self.deck.deal())
-            self.logger.debug("Player {}'s hand: {}".format(i, self.hands[i]))
-
-        # Return the hand of the dealer.
-        self.state = State(
-            self.hands[self.player],
-            self.player,
-            None,
-            self.phase
-        )
+        # Pick dealer, clear table, shuffle, deal cards.
+        reward, done, _ = self._reset_hand(dealer=dealer)
 
         self.initialized = True
 
-        return(self.state, 0, False, "Reset!")
+        return(self.state, reward, done, "Reset Game!")
 
     def step(self, card):
         """
@@ -350,6 +327,7 @@ class CribbageEnv(gym.Env):
             raise Exception("Need to CribbageEnv.reset() before first step.")
 
         done = False
+        self.new_hand = False
         debug = "step!"
 
         # The Deal.
@@ -370,13 +348,11 @@ class CribbageEnv(gym.Env):
             if sum(counts) / float(self.n_players) == 4:
                 self.phase = 1
                 self.starter = [self.deck.deal()]
-
                 self.logger.debug("Starter drawn={}".format(self.starter))
 
-                # 2 for his heels.
                 if self.starter[0].rank == "J":
                     reward = 2
-                    self.logger.debug("Two for his heels!")
+                    self.logger.debug("Two for his (the dealer's) heels!")
 
                 # Start next phase from the left of the dealer.
                 self.player = self.next_player(self.player, from_dealer=True)
@@ -388,11 +364,18 @@ class CribbageEnv(gym.Env):
             else:
                 self.player = self.next_player(self.player)
 
+            # Keep track of the player's total score.
+            self.scores[self.dealer] += reward
+
+            # Reward always goes to the dealer during the deal.
+            player_score, opponent_scores = self._get_scores()
             self.state = State(
                 Stack(playable_hands[self.player]),
                 self.player,
-                self.last_player,
-                self.phase
+                self.dealer,
+                self.phase,
+                player_score,
+                opponent_scores
             )
 
         # The Play.
@@ -425,14 +408,14 @@ class CribbageEnv(gym.Env):
                     reward += 1
                     self.logger.debug("reward+1 for last player.")
 
-
                 remaining_cards = self._count_remaining_cards()
 
                 # Move onto The Show.
                 if remaining_cards == 0:
                     self.logger.debug("No cards left, time for The Show.")
                     self.phase = 2
-                    self.player = self.next_player(self.player, from_dealer=True)
+                    self.player = self.next_player(self.player,
+                                                   from_dealer=True)
 
                 # Reset the table and playable cards.
                 else:
@@ -448,15 +431,20 @@ class CribbageEnv(gym.Env):
             # Go! Skip to the next player who has a playable hand.
             else:
                 self.player = self.next_player(self.player)
-
                 self._next_avail_player(counts, playable_hands)
 
+            # Keep track of the player's total score.
+            self.scores[self.last_player] += reward
+
             # When self.phase == 2, playable_hands[self.player] will be empty.
+            player_score, opponent_scores = self._get_scores()
             self.state = State(
                 Stack(playable_hands[self.player]),
                 self.player,
                 self.last_player,
-                self.phase
+                self.phase,
+                player_score,
+                opponent_scores
             )
 
             self.prev_phase = 1
@@ -464,24 +452,62 @@ class CribbageEnv(gym.Env):
         # The Show.
         elif self.phase == 2:
 
+
             # Calculate points for self.player.
             reward = self._evaluate_show()
 
             # Went around the circle once. This hand is over.
             if self.player == self.dealer:
-                done = True
+                self.new_hand = True
 
             self.last_player = copy(self.player)
             self.player = self.next_player(self.player)
 
-            self.state = State(Stack([]), self.player, self.last_player, self.phase)
+            # Keep track of the player's total score.
+            self.scores[self.last_player] += reward
+            player_score, opponent_scores = self._get_scores()
+            self.state = State(
+                Stack([]),
+                self.player,
+                self.last_player,
+                self.phase,
+                player_score,
+                opponent_scores
+            )
 
             self.prev_phase = 2
 
-        # Keep track of the player's total score.
-        self.scores[self.last_player] += reward
+        # If any player, at any time, gets a winning amount of points.
+        if any(self.scores >= MAX_ROUND_VALUE):
+            done = True
+
+            # Forces user to reset the environment for the next game.
+            self.new_hand = False
+            self.initialized = False
+
+        # If we go around the circle once during Phase 2.
+        elif self.new_hand:
+
+            # The next hand is dealt by the person next to the dealer.
+            next_dealer = self.next_player(self.dealer)
+            self._reset_hand(dealer=next_dealer, reward_id=self.state.reward_id)
 
         return(self.state, reward, done, debug)
+
+    def next_player(self, player, from_dealer=False):
+        """
+        Increments through the players. Increments forever, but can be set
+        to start from the dealer.
+        """
+        if from_dealer:
+            player = copy(self.dealer)
+
+        player += 1
+        if player > self.n_players - 1:
+            player = 0
+
+        self.logger.debug("Player={}".format(self.player))
+        return player
 
     def render(self, mode='human'):
         """Renders a table of the current game."""
@@ -510,6 +536,13 @@ class CribbageEnv(gym.Env):
 
     def close(self):
         pass
+
+    def _get_scores(self):
+        player_score = self.scores[self.player]
+        opponent_scores = self.scores[np.setdiff1d(range(self.n_players),
+                                                         self.player)]
+
+        return(player_score, opponent_scores)
 
     def _get_rows(self, iterable):
         """Split input data by row and then on spaces."""
@@ -586,22 +619,6 @@ class CribbageEnv(gym.Env):
                 )
                 self.player = self.next_player(self.player)
 
-
-    def next_player(self, player, from_dealer=False):
-        """
-        Increments through the players. Increments forever, but can be set
-        to start from the dealer.
-        """
-        if from_dealer:
-            player = copy(self.dealer)
-
-        player += 1
-        if player > self.n_players - 1:
-            player = 0
-
-        self.logger.debug("Player={}".format(self.player))
-        return player
-
     def _reset_table(self):
         """
         This method moves all cards on the table to a discard pile and
@@ -613,6 +630,64 @@ class CribbageEnv(gym.Env):
 
         self.table_value = 0
         self.table = Stack()
+
+    def _reset_hand(self, dealer=None, reward_id=None):
+        """
+        All the steps required to start a new hand. Shuffles the deck, deals
+        cards to each of the n_player's hands, and randomly selects the
+        dealer. Each user receives the appropriate number of cards.
+        """
+        self.logger.debug("New hand!")
+
+        self.deck = Deck()
+
+        # Stores the playable cards in each player's hand.
+        self.hands = [Stack() for i in range(self.n_players)]
+
+        # Stores the cards played by each player.
+        self.played = [Stack() for i in range(self.n_players)]
+
+        # Stores the cards played by each player (in order) for The Play.
+        self.table = Stack()
+
+        # Stores the crib generated during The Deal.
+        self.crib = Stack()
+        self.starter = Stack()
+        self.discarded = Stack()
+
+        # Randomly select the dealer. Initalize the player to be the same.
+        self.dealer = random.randint(0, self.n_players - 1) if dealer is None \
+                                                            else dealer
+
+        self.logger.debug("Player {} has the crib".format(self.dealer))
+        self.player = copy(self.dealer)
+        self.last_player = copy(self.dealer)
+
+        self.table_value = 0
+        self.phase = 0  # 0: the deal, 1: the play, 2: the show.
+        self.prev_phase = 0  # To catch phase transitions
+
+        # Deal cards to all users.
+        for i in range(self.n_players):
+            for j in range(self._cards_per_hand):
+                self.hands[i].add_(self.deck.deal())
+            self.logger.debug("Player {}'s hand: {}".format(i, self.hands[i]))
+
+        # Return the hand of the dealer.
+        player_score, opponent_scores = self._get_scores()
+        self.state = State(
+            self.hands[self.player],
+            self.player,
+            reward_id,
+            self.phase,
+            player_score,
+            opponent_scores
+        )
+
+        reward = 0
+        done = False
+
+        return(reward, done, "Reset Hand!")
 
     def _evaluate_play(self):
         """
@@ -785,7 +860,7 @@ def same_suit_points(hand, knob, is_crib=False):
 
 
 def card_to_idx(card):
-    return (rank_to_idx[card.rank], suit_to_idx[card.suit])
+    return (RANK_TO_IDX[card.rank], SUIT_TO_IDX[card.suit])
 
 
 def stack_to_idx(stack):
@@ -795,9 +870,8 @@ def stack_to_idx(stack):
 
 
 if __name__ == "__main__":
-    print("2 Player Interactive Mode:")
-    env = CribbageEnv(verbose=True)
 
+    env = CribbageEnv(verbose=True)
     state, reward, done, debug = env.reset()
 
     while not done:
@@ -806,7 +880,4 @@ if __name__ == "__main__":
             state, reward, done, debug = env.step(state.hand[0])
         else:
             state, reward, done, debug = env.step([])
-
         env.render()
-
-    import IPython; IPython.embed()
