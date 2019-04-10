@@ -211,6 +211,16 @@ class Stack(object):
             raise ValueError("Can only add card to a hand.")
         self.cards.append(card)
 
+    def remove(self, card):
+        if not isinstance(card, Card):
+            raise ValueError("Can only add card to a hand.")
+        return Stack(cards=[c for c in self.cards if c != card])
+
+    def remove_(self, card):
+        if not isinstance(card, Card):
+            raise ValueError("Can only add card to a hand.")
+        self.cards = [c for c in self.cards if c != card]
+
     def __repr__(self):
         if len(self.cards) == 0:
             return("empty")
@@ -283,7 +293,7 @@ class CribbageEnv(gym.Env):
         self.logger.debug("New Game!")
 
         # Reset the persistant scores of all players.
-        self.scores = np.zeros(self.n_players, dtype=np.int8)
+        self.scores = np.zeros(self.n_players, dtype=np.uint8)
 
         # Allows the user to see whether we are dealing with a new hand.
         self.new_hand = True
@@ -355,7 +365,7 @@ class CribbageEnv(gym.Env):
                 self.player = self.next_player(self.player)
 
             # Keep track of the player's total score.
-            self.scores[self.last_player] += reward
+            self.scores[self.dealer] += reward
 
             # Reward always goes to the dealer during the deal.
             player_score, opponent_scores = self._get_scores()
@@ -442,6 +452,7 @@ class CribbageEnv(gym.Env):
         # The Show.
         elif self.phase == 2:
 
+
             # Calculate points for self.player.
             reward = self._evaluate_show()
 
@@ -454,7 +465,6 @@ class CribbageEnv(gym.Env):
 
             # Keep track of the player's total score.
             self.scores[self.last_player] += reward
-
             player_score, opponent_scores = self._get_scores()
             self.state = State(
                 Stack([]),
@@ -468,7 +478,7 @@ class CribbageEnv(gym.Env):
             self.prev_phase = 2
 
         # If any player, at any time, gets a winning amount of points.
-        if any(self.scores > MAX_ROUND_VALUE):
+        if any(self.scores >= MAX_ROUND_VALUE):
             done = True
 
             # Forces user to reset the environment for the next game.
@@ -480,7 +490,7 @@ class CribbageEnv(gym.Env):
 
             # The next hand is dealt by the person next to the dealer.
             next_dealer = self.next_player(self.dealer)
-            self._reset_hand(dealer=next_dealer)
+            self._reset_hand(dealer=next_dealer, reward_id=self.state.reward_id)
 
         return(self.state, reward, done, debug)
 
@@ -621,7 +631,7 @@ class CribbageEnv(gym.Env):
         self.table_value = 0
         self.table = Stack()
 
-    def _reset_hand(self, dealer=None):
+    def _reset_hand(self, dealer=None, reward_id=None):
         """
         All the steps required to start a new hand. Shuffles the deck, deals
         cards to each of the n_player's hands, and randomly selects the
@@ -668,7 +678,7 @@ class CribbageEnv(gym.Env):
         self.state = State(
             self.hands[self.player],
             self.player,
-            self.player,
+            reward_id,
             self.phase,
             player_score,
             opponent_scores
