@@ -338,13 +338,11 @@ class CribbageEnv(gym.Env):
             if sum(counts) / float(self.n_players) == 4:
                 self.phase = 1
                 self.starter = [self.deck.deal()]
-
                 self.logger.debug("Starter drawn={}".format(self.starter))
 
-                # 2 for his heels.
                 if self.starter[0].rank == "J":
                     reward = 2
-                    self.logger.debug("Two for his heels!")
+                    self.logger.debug("Two for his (the dealer's) heels!")
 
                 # Start next phase from the left of the dealer.
                 self.player = self.next_player(self.player, from_dealer=True)
@@ -359,11 +357,12 @@ class CribbageEnv(gym.Env):
             # Keep track of the player's total score.
             self.scores[self.last_player] += reward
 
+            # Reward always goes to the dealer during the deal.
             player_score, opponent_scores = self._get_scores()
             self.state = State(
                 Stack(playable_hands[self.player]),
                 self.player,
-                self.last_player,
+                self.dealer,
                 self.phase,
                 player_score,
                 opponent_scores
@@ -399,7 +398,6 @@ class CribbageEnv(gym.Env):
                     reward += 1
                     self.logger.debug("reward+1 for last player.")
 
-
                 remaining_cards = self._count_remaining_cards()
 
                 # Move onto The Show.
@@ -423,7 +421,6 @@ class CribbageEnv(gym.Env):
             # Go! Skip to the next player who has a playable hand.
             else:
                 self.player = self.next_player(self.player)
-
                 self._next_avail_player(counts, playable_hands)
 
             # Keep track of the player's total score.
