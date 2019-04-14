@@ -44,10 +44,11 @@ logging.basicConfig(
 class Card(object):
     """Card, french style"""
 
-    def __init__(self, rank, suit):
+    def __init__(self, rank, suit, player=None):
         super(Card, self).__init__()
         self.rank = rank
         self.suit = suit
+        self.player = player
 
     @property
     def value(self):
@@ -125,9 +126,14 @@ class Deck(object):
 
         random.shuffle(self.cards)
 
-    def deal(self):
+    def deal(self, player=None):
+        """
+        Deals a card. Optionally tell what player is getting this card
+        """
         try:
-            return self.cards.pop(0)
+            card = self.cards.pop(0)
+            card.player = player
+            return card
         except IndexError:
             return None
 
@@ -257,6 +263,7 @@ class State(object):
         self.phase = phase
         self.player_score = player_score
         self.opponent_score = opponent_score
+
 
 class CribbageEnv(gym.Env):
     """
@@ -670,7 +677,9 @@ class CribbageEnv(gym.Env):
         # Deal cards to all users.
         for i in range(self.n_players):
             for j in range(self._cards_per_hand):
-                self.hands[i].add_(self.deck.deal())
+                card = self.deck.deal()
+                card.player = i
+                self.hands[i].add_(card)
             self.logger.debug("Player {}'s hand: {}".format(i, self.hands[i]))
 
         # Return the hand of the dealer.
