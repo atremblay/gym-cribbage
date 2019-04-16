@@ -677,9 +677,7 @@ class CribbageEnv(gym.Env):
         # Deal cards to all users.
         for i in range(self.n_players):
             for j in range(self._cards_per_hand):
-                card = self.deck.deal()
-                card.player = i
-                self.hands[i].add_(card)
+                self.hands[i].add_(self.deck.deal(player=i))
             self.logger.debug("Player {}'s hand: {}".format(i, self.hands[i]))
 
         # Return the hand of the dealer.
