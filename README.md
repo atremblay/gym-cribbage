@@ -57,6 +57,8 @@ Actions taken during steps have different meaning during each phase of the game.
   environment `state, reward, done, debug = env.step(Card(99, SUITS[0]))`,
   which can be easily done if one imports some utility classes from
   `cribbage_env`: `from gym_cribbage.envs.cribbage_env import Card, SUITS`.
+  The purpose of these steps is to return the appropriate points to each agent
+  for Show (in sequence, following the rules of Cribbage).
 
 ## Rules
 https://en.wikipedia.org/wiki/Cribbage
